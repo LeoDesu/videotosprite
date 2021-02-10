@@ -8,7 +8,9 @@ video-to-sprite is a bash script that use command line program called "ffmpeg" t
 - ffprobe
 
 ## Usage
-<p>usage: videotosprite $input.mp4 $outputname</p>
+```
+bash videotosprite.sh $input.mp4 $outputname
+```
 
 <p>$outputname the program will automaticaly generate as .jpg file</p>
 <p>videotosprite generates sprite sheet from a .mp4 video with the dimension of 10x10</p>
