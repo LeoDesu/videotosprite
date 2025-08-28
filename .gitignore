@@ -1,0 +1,9 @@
+/.fleet
+/.idea
+/.vscode
+/.zed
+/vendor
+/node_modules
+/videos
+/Videos
+/tests
