@@ -11,11 +11,14 @@ else if ($argc < 3) {
     $help = true;
   } else {
     $input = path($cwd, $argv[array_key_last($argv)]);
-    $output = path($cwd, 'output');
+    $output = substr($input, 0, strrpos($input, '.')).'_sprite';
   }
 } else{
   if(substr($argv[array_key_last($argv)], 0, 1) === '-' || substr($argv[array_key_last($argv)-1], 0, 1) === '-') {
     $help = true;
+  } else if ($argc > 3 && substr($argv[array_key_last($argv)-2], 0, 1) === '-'){
+    $input = path($cwd, $argv[array_key_last($argv)]);
+    $output = substr($input, 0, strrpos($input, '.')).'_sprite';
   } else {
     $input = path($cwd, $argv[array_key_last($argv)-1]);
     $output = path($cwd, $argv[array_key_last($argv)]);
