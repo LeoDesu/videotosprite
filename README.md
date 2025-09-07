@@ -43,7 +43,7 @@ php videotosprite.php [video_input] [output_name]
 
 ### use --size option to provide custom size
 ```
-php videotosprite.php [video_input] [output_name] --size 4x4
+php videotosprite.php --size 4x4 [video_input] [output_name]
 ```
 <p>parameter for --size are numbers of WIDTHxHEIGHT with x as separater and no white space</p>
 
