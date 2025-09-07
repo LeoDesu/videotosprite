@@ -1,17 +1,33 @@
-#!/bin/env php
+#!/usr/bin/env php
 <?php
 
 declare(strict_types=1);
 
+$cwd = getcwd() . '/';
 $help = false;
 if ($argc < 2) $help = true;
+else if ($argc < 3) {
+  if(substr($argv[array_key_last($argv)], 0, 1) === '-') {
+    $help = true;
+  } else {
+    $input = path($cwd, $argv[array_key_last($argv)]);
+    $output = path($cwd, 'output');
+  }
+} else{
+  if(substr($argv[array_key_last($argv)], 0, 1) === '-' || substr($argv[array_key_last($argv)-1], 0, 1) === '-') {
+    $help = true;
+  } else {
+    $input = path($cwd, $argv[array_key_last($argv)-1]);
+    $output = path($cwd, $argv[array_key_last($argv)]);
+  }
+}
+
 $generate = true;
 $res_width = 320;
 $res_height = -1;
 $rows = 10;
 $cols = 10;
 $capture = 0;
-$cwd = getcwd() . '/';
 $tempdir = $cwd . "temp";
 
 foreach($argv as $i => $arg){
@@ -177,8 +193,5 @@ function path(string $dir, string $arg) {
 }
 
 if($generate){
-  $input = path($cwd, $argv[1]);
-  $output = path($cwd, $argv[2]);
-
   generate($input, $output, $tempdir, $res_width, $res_height, $rows, $cols, $capture, true);
 }
