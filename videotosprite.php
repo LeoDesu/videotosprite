@@ -85,7 +85,7 @@ foreach($argv as $i => $arg){
 
 if($help){
   echo <<<HELP
-usage: videotosprite <input_video> <outputname> [options]
+usage: videotosprite [options] <input_video> <outputname>
 videotosprite generates sprite sheet from a video
 
 options:
