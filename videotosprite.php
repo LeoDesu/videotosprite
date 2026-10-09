@@ -7,27 +7,28 @@ $cwd = getcwd() . '/';
 $help = false;
 if ($argc < 2) $help = true;
 else if ($argc < 3) {
-  if(substr($argv[array_key_last($argv)], 0, 1) === '-') {
+  if(substr($argv[$argk_last = array_key_last($argv)], 0, 1) === '-') {
     $help = true;
   } else {
-    $input = path($cwd, $argv[array_key_last($argv)]);
+    $input = path($cwd, $argv[$argk_last]);
     $output = substr($input, 0, strrpos($input, '.')).'_sprite';
   }
 } else{
-  if(substr($argv[array_key_last($argv)], 0, 1) === '-' || substr($argv[array_key_last($argv)-1], 0, 1) === '-') {
+  if(substr($argv[$argk_last = array_key_last($argv)], 0, 1) === '-' || substr($argv[$argk_last-1], 0, 1) === '-') {
     $help = true;
-  } else if ($argc > 3 && substr($argv[array_key_last($argv)-2], 0, 1) === '-'){
-    $input = path($cwd, $argv[array_key_last($argv)]);
+  } else if ($argc > 3 && substr($argv[$argk_last-2], 0, 1) === '-'){
+    $input = path($cwd, $argv[$argk_last]);
     $output = substr($input, 0, strrpos($input, '.')).'_sprite';
   } else {
-    $input = path($cwd, $argv[array_key_last($argv)-1]);
-    $output = path($cwd, $argv[array_key_last($argv)]);
+    $input = path($cwd, $argv[$argk_last-1]);
+    $output = path($cwd, $argv[$argk_last]);
   }
 }
 
 $generate = true;
-$res_width = 320;
-$res_height = -1;
+$default_length = 320;
+$out_width = 0;
+$out_height = 0;
 $rows = 10;
 $cols = 10;
 $capture = 0;
@@ -39,27 +40,23 @@ foreach($argv as $i => $arg){
     continue;
   }
   if($arg === '--res') {
+    //TODO: implement percentage based resulution scaling
     if(str_contains($argv[$i+1], 'x')) {
       $res = explode('x', $argv[$i+1]);
-      $res_width = (int)$res[0];
-      $res_height = (int)$res[1];
-      if($res_height % 2 !== 0) $help = true;
+      $out_width = (int)$res[0];
+      $out_height = (int)$res[1];
+      if($out_height % 2 !== 0) $help = true;
       continue;
     } else {
-      $res_width = intval($argv[$i+1]);
-      if($res_width <= 0) {
+      $out_length = intval($argv[$i+1]);
+      if($out_length <= 0) {
         $help = true;
         continue;
       }
-      $origin_res = getVideoResolution(path($cwd, $argv[1]));
-      $origin_width = (int)$origin_res['width'];
-      $origin_height = (int)$origin_res['height'];
-      $scale = $res_width / $origin_width;
-      if(($origin_height * $scale) % 2 !== 0) {
-        echo "not divisible by 2!\n";
-        $help = true;
-        continue;
-      }
+      $in_res = getVideoResolution($input);
+      $out_res = calculateResolution($in_res, $out_length);
+      $out_width = $out_res->width;
+      $out_height = $out_res->height;
     }
   }
   if($arg === '--size') {
@@ -100,21 +97,30 @@ HELP;
   $generate = false;
 }
 
-function generate(string $input, string $output, string $tempdir, int $res_w, int $res_h, int $width, int $height, int $capture, bool $log = true) {
+class Resolution {
+    public function __construct(
+        public int $width = 0,
+        public int $height = 0,
+    ) {}
+}
+
+function generate(string $input, string $output, string $tempdir, int $out_w, int $out_h, int $cols, int $rows, int $capture, bool $log = true) {
   $tempname = makeTempName($tempdir);
   $dirmade = false;
   if (!file_exists($tempdir)) $dirmade = mkdir($tempdir);
-  $tempv = scaleDown($input, $tempname.'.mp4', $res_w, $res_h, $log);
+  $tempv = scaleDown($input, $tempname.'.mp4', $out_w, $out_h, $log);
   if($tempv === false){
     if ($dirmade) rmdir($tempdir);
     if ($log) echo "\e[31m[Sprite]\e[0m can not scale video to this resolution, please change the value\n";
     return false;
   }
-  $images = extractImages($tempv, $width*$height, $tempname, $capture, $log);
+  $images = extractImages($tempv, $cols*$rows, $tempname, $capture, $log);
   if(strpos($output, '.') === false) $output .= '.jpg';
-  $filepath = combineSprite($images, $output, $width, $height, $tempname, $log);
-  foreach($images as $image) unlink($image);
-  unlink($tempv);
+  $filepath = combineSprite($images, $output, $cols, $rows, $tempname, $log);
+  foreach($images as $image) {
+      if(file_exists($image)) unlink($image);
+  }
+  if(file_exists($tempv)) unlink($tempv);
   if ($dirmade) rmdir($tempdir);
   return $filepath;
 }
@@ -123,27 +129,31 @@ function makeTempName(string $tempdir) {
   return $tempdir . '/' . date("YmdHis") . 'videotosprite_tempfile';
 }
 
-function scaleDown(string $in, string $out, int $width = 320, int $height = -1, bool $log = true): string|false {
-  if ($log) echo "\e[32m[Sprite]\e[0m scaling down...\n";
+function scaleDown(string $in, string $out, int $width, int $height, bool $log = true): string|false {
+  if ($log) echo "\e[32m[Sprite]\e[0m scaling to: {$width}x{$height}\n";
   $result = exec("ffmpeg -loglevel 'quiet' -i '$in' -vf 'fps=10,scale={$width}:{$height}' '$out'");
   if($result === false) return false;
   return $out;
 }
+function calculateResolution(Resolution $in_res, int $length): Resolution{
+    $scale = max($in_res->width, $in_res->height)/$length;
+    $width = (int)($in_res->width/$scale);
+    $height = (int)($in_res->height/$scale);
+    $width = ($width%2) === 0 ? $width : $width-1;
+    $height = ($height%2) === 0 ? $height : $height-1;
+    return new Resolution($width, $height);
+}
 
-function getVideoResolution(string $video){
-  exec("ffprobe -v error -print_format json -show_streams '{$video}'", $streams_json);
-  $streams_json = implode('', $streams_json);
-  /** @var array */
-  $streams = json_decode($streams_json)->streams;
-  $res = [];
-  foreach($streams as $stream){
-    //TODO: php waring: undefined property: stdClass::$width
-    if(boolval($stream?->width) && boolval($stream?->height)){
-      $res['width']  = $stream->width;
-      $res['height'] = $stream->height;
+function getVideoResolution(string $vpath): Resolution{
+    $cout = '';
+    exec("ffprobe -v error -show_entries stream=width,height -of csv=s=x:p=0 '{$vpath}'", $cout);
+    $res = implode('', $cout);
+    if($res){
+        $s = explode('x', $res);
+        $res = new Resolution(intval($s[0]), intval($s[1]));
+        return $res;
     }
-  }
-  return $res;
+    return new Resolution();
 }
 
 function extractImages(string $in, int $count = 100, string $tempname, int $capture, bool $log = true): array {
@@ -186,7 +196,9 @@ function combineSprite(array $images, string $out, int $width, int $height, stri
   }
   if ($log) echo "\e[32m[Sprite]\e[0m combining result...\n";
   $result = stack($row_outs, $out, 'v');
-  foreach($row_outs as $image) unlink($image);
+  foreach($row_outs as $image) {
+      if(file_exists($image)) unlink($image);
+  }
   if(gettype($result) === 'string') return $result;
   return false;
 }
@@ -196,5 +208,11 @@ function path(string $dir, string $arg) {
 }
 
 if($generate){
-  generate($input, $output, $tempdir, $res_width, $res_height, $rows, $cols, $capture, true);
+    if($out_width === 0 && $out_height === 0){
+        $in_res = getVideoResolution($input);
+        $res = calculateResolution($in_res, $default_length);
+        $out_width = $res->width;
+        $out_height = $res->height;
+    }
+  generate($input, $output, $tempdir, $out_width, $out_height, $rows, $cols, $capture, true);
 }
